@@ -1,11 +1,12 @@
+mod guards;
 mod queue;
 mod routes;
 mod scheduler;
 mod util;
-mod guards;
 
 use crate::queue::AnalyticsQueue;
 use crate::routes::index;
+use crate::routes::ingest;
 use crate::util::{parse_strings_from_var, parse_var};
 use actix_cors::Cors;
 use actix_web::{http, web, App, HttpServer};
@@ -13,7 +14,6 @@ use log::{error, info, warn};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::routes::ingest;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

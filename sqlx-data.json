@@ -1,0 +1,44 @@
+{
+  "db": "PostgreSQL",
+  "807374fe0f07a721eed81411c832d485275a181dd069257e18802d401e4b754e": {
+    "query": "\n                    INSERT INTO views (views, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "8c38e262a5bd50a7e2e6a20ae6d6c17503d4e0da7e9477ca409e84ba3a4d67ab": {
+    "query": "\n                    INSERT INTO downloads (downloads, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a6ab7057158132b982d60d0e6dc81cf597851e66928015043bca9ddad621dc50": {
+    "query": "\n                    INSERT INTO revenue (money, project_id)\n                    VALUES ($1, $2)\n                    ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Float4",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  }
+}

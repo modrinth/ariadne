@@ -1,3 +1,4 @@
+use crate::guards::admin_key_guard;
 use crate::routes::ApiError;
 use crate::AnalyticsQueue;
 use actix_web::HttpResponse;
@@ -5,7 +6,6 @@ use actix_web::{post, web};
 use serde::Deserialize;
 use std::sync::Arc;
 use url::Url;
-use crate::guards::admin_key_guard;
 
 #[derive(Deserialize)]
 pub struct UrlInput {
