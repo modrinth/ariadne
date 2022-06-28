@@ -3,19 +3,25 @@ use sqlx::PgPool;
 use std::hash::Hash;
 
 #[derive(Eq, PartialEq, Hash, Clone)]
-struct NumericKey {
-    project_id: String,
+struct DownloadKey {
+    project_id: u64,
+    site_path: String,
+}
+
+#[derive(Eq, PartialEq, Hash, Clone)]
+struct PageViewKey {
+    project_id: Option<u64>,
     site_path: String,
 }
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct RevenueKey {
-    project_id: String,
+    project_id: u64,
 }
 
 pub struct AnalyticsQueue {
-    views_queue: DashMap<NumericKey, u32>,
-    downloads_queue: DashMap<NumericKey, u32>,
+    views_queue: DashMap<PageViewKey, u32>,
+    downloads_queue: DashMap<DownloadKey, u32>,
     revenue_queue: DashMap<RevenueKey, f32>,
 }
 
@@ -29,8 +35,8 @@ impl AnalyticsQueue {
         }
     }
 
-    pub async fn add_view(&self, project_id: String, site_path: String) {
-        let key = NumericKey {
+    pub async fn add_view(&self, project_id: Option<u64>, site_path: String) {
+        let key = PageViewKey {
             project_id,
             site_path,
         };
@@ -42,8 +48,8 @@ impl AnalyticsQueue {
         }
     }
 
-    pub async fn add_download(&self, project_id: String, site_path: String) {
-        let key = NumericKey {
+    pub async fn add_download(&self, project_id: u64, site_path: String) {
+        let key = DownloadKey {
             project_id,
             site_path,
         };
@@ -55,7 +61,7 @@ impl AnalyticsQueue {
         }
     }
 
-    pub async fn add_revenue(&self, project_id: String, revenue: f32) {
+    pub async fn add_revenue(&self, project_id: u64, revenue: f32) {
         let key = RevenueKey { project_id };
 
         if let Some(mut val) = self.revenue_queue.get_mut(&key) {
@@ -86,7 +92,7 @@ impl AnalyticsQueue {
                     VALUES ($1, $2, $3)
                     ",
                     value as i32,
-                    key.project_id,
+                    key.project_id.map(|x| x as i64),
                     key.site_path,
                 )
                 .execute(&mut *transaction)
@@ -100,7 +106,7 @@ impl AnalyticsQueue {
                     VALUES ($1, $2, $3)
                     ",
                     value as u32,
-                    key.project_id,
+                    key.project_id as i64,
                     key.site_path,
                 )
                 .execute(&mut *transaction)
@@ -114,7 +120,7 @@ impl AnalyticsQueue {
                     VALUES ($1, $2)
                     ",
                     value,
-                    key.project_id,
+                    key.project_id as i64,
                 )
                 .execute(&mut *transaction)
                 .await?;

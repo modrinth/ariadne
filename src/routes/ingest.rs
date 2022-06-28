@@ -1,8 +1,9 @@
+use crate::base62::parse_base62;
 use crate::guards::admin_key_guard;
 use crate::routes::ApiError;
-use crate::AnalyticsQueue;
-use actix_web::HttpResponse;
+use crate::{AnalyticsQueue, RateLimitQueue};
 use actix_web::{post, web};
+use actix_web::{HttpRequest, HttpResponse};
 use serde::Deserialize;
 use std::sync::Arc;
 use url::Url;
@@ -30,14 +31,11 @@ pub async fn downloads_ingest(
         .nth(1)
         .ok_or_else(|| ApiError::InvalidInput("invalid download URL specified!".to_string()))?;
 
-    if id.len() < 8 || id.len() > 11 {
-        return Err(ApiError::InvalidInput(
-            "invalid project ID in download URL!".to_string(),
-        ));
-    }
+    let parsed = parse_base62(id)
+        .map_err(|_| ApiError::InvalidInput("invalid project ID in download URL!".to_string()))?;
 
     analytics_queue
-        .add_download(id.to_string(), url.to_string())
+        .add_download(parsed, url.path().to_string())
         .await;
 
     Ok(HttpResponse::NoContent().body(""))
@@ -51,28 +49,108 @@ pub struct RevenueInput {
 
 //Internal (can only be called with key) - protections are lax
 //called from ads payouts provider. TODO: figure out how to record this
+//route may be obsolete depending on what ads provider is used
 #[post("v1/revenue", guard = "admin_key_guard")]
 pub async fn revenue_ingest(
     analytics_queue: web::Data<Arc<AnalyticsQueue>>,
     revenue_input: web::Json<RevenueInput>,
 ) -> Result<HttpResponse, ApiError> {
-    if revenue_input.project_id.len() < 8 || revenue_input.project_id.len() > 11 {
-        return Err(ApiError::InvalidInput(
-            "invalid project ID in download URL!".to_string(),
-        ));
-    }
-
     if revenue_input.revenue > 5.0 {
         return Err(ApiError::InvalidInput(
             "revenue exceeds individual request allowance!".to_string(),
         ));
     }
 
+    let parsed = parse_base62(&revenue_input.project_id)
+        .map_err(|_| ApiError::InvalidInput("invalid project ID in download URL!".to_string()))?;
+
     analytics_queue
-        .add_revenue(revenue_input.project_id.clone(), revenue_input.revenue)
+        .add_revenue(parsed, revenue_input.revenue)
         .await;
 
     Ok(HttpResponse::NoContent().body(""))
 }
 
-//TODO: implement ingest of page views with validation + spam protection
+//this route should be behind the cloudflare WAF to prevent non-browsers from calling it
+#[post("v1/view")]
+pub async fn page_view_ingest(
+    req: HttpRequest,
+    rate_limit_queue: web::Data<Arc<RateLimitQueue>>,
+    analytics_queue: web::Data<Arc<AnalyticsQueue>>,
+    url_input: web::Json<UrlInput>,
+) -> Result<HttpResponse, ApiError> {
+    let admin_key = dotenv::var("ARIADNE_ADMIN_KEY")?;
+
+    let conn_info = req.connection_info();
+
+    let ip = if let Some(header) = req.headers().get("CF-Connecting-IP") {
+        header.to_str().ok()
+    } else {
+        conn_info.peer_addr()
+    }
+    .unwrap_or_default();
+
+    let url = Url::parse(&url_input.site_path)
+        .map_err(|_| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
+
+    if !req
+        .headers()
+        .get(crate::guards::ADMIN_KEY_HEADER)
+        .and_then(|x| x.to_str().ok())
+        .map(|x| x == &*admin_key)
+        .unwrap_or_default()
+        || !rate_limit_queue
+            .add(ip.to_string(), url.path().to_string())
+            .await
+    {
+        // early return, unauthorized
+        return Ok(HttpResponse::NoContent().body(""));
+    }
+
+    if let Some(segments) = url.path_segments() {
+        let segments_vec = segments.collect::<Vec<_>>();
+
+        if segments_vec.len() >= 2 {
+            //todo: fetch from labrinth periodically when route exists
+            const PROJECT_TYPES: &[&str] = &["mod", "modpack"];
+
+            if PROJECT_TYPES.contains(&segments_vec[0]) {
+                #[derive(Deserialize)]
+                struct CheckResponse {
+                    id: String,
+                }
+
+                let client = reqwest::Client::new();
+
+                let response = client
+                    .get(format!(
+                        "{}project/{}/check",
+                        dotenv::var("LABRINTH_API_URL")?,
+                        &segments_vec[1]
+                    ))
+                    .header("x-ratelimit-key", dotenv::var("LABRINTH_RATE_LIMIT_KEY")?)
+                    .send()
+                    .await?;
+
+                if response.status().is_success() {
+                    let check_response = response.json::<CheckResponse>().await?;
+
+                    analytics_queue
+                        .add_view(
+                            Some(parse_base62(&check_response.id).unwrap_or_default()),
+                            url_input.site_path.clone(),
+                        )
+                        .await;
+
+                    return Ok(HttpResponse::NoContent().body(""));
+                }
+            }
+        }
+    }
+
+    analytics_queue
+        .add_view(None, url_input.site_path.clone())
+        .await;
+
+    Ok(HttpResponse::NoContent().body(""))
+}

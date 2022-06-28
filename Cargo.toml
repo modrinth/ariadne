@@ -28,3 +28,7 @@ futures = "0.3.21"
 tokio = "1.19.2"
 tokio-stream = "0.1.9"
 dashmap = "5.3.4"
+
+sha2 = "0.10.2"
+
+reqwest = { version = "0.11", features = ["json"] }

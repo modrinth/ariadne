@@ -1,12 +1,13 @@
+mod base62;
 mod guards;
-mod queue;
 mod routes;
-mod scheduler;
+mod scheduled;
 mod util;
 
-use crate::queue::AnalyticsQueue;
 use crate::routes::index;
 use crate::routes::ingest;
+use crate::scheduled::analytics::AnalyticsQueue;
+use crate::scheduled::ratelimit::RateLimitQueue;
 use crate::util::{parse_strings_from_var, parse_var};
 use actix_cors::Cors;
 use actix_web::{http, web, App, HttpServer};
@@ -55,7 +56,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Error while applying database migrations.");
 
-    let mut scheduler = scheduler::Scheduler::new();
+    let mut scheduler = scheduled::scheduler::Scheduler::new();
 
     let analytics_queue = Arc::new(AnalyticsQueue::new());
 
@@ -73,6 +74,24 @@ async fn main() -> std::io::Result<()> {
                     warn!("Indexing analytics queue failed: {:?}", e);
                 }
                 info!("Done indexing analytics queue");
+            }
+        });
+    }
+
+    let rate_limit_queue = Arc::new(RateLimitQueue::new(
+        dotenv::var("PEPPER").expect("Pepper not supplied in env variables!"),
+    ));
+
+    {
+        let rate_limit_queue_ref = rate_limit_queue.clone();
+
+        scheduler.run(Duration::from_secs(60 * 60), move || {
+            let rate_limit_queue_ref = rate_limit_queue_ref.clone();
+
+            async move {
+                info!("Indexing rate limit queue");
+                rate_limit_queue_ref.index().await;
+                info!("Done indexing rate limit queue");
             }
         });
     }
@@ -98,6 +117,7 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(analytics_queue.clone()))
+            .app_data(web::Data::new(rate_limit_queue.clone()))
             .service(index::index_get)
             .service(ingest::revenue_ingest)
             .service(ingest::downloads_ingest)
@@ -133,6 +153,11 @@ fn check_env_vars() -> bool {
     failed |= check_var::<String>("DATABASE_URL");
 
     failed |= check_var::<String>("ARIADNE_ADMIN_KEY");
+
+    failed |= check_var::<String>("PEPPER");
+
+    failed |= check_var::<String>("LABRINTH_API_URL");
+    failed |= check_var::<String>("LABRINTH_RATE_LIMIT_KEY");
 
     failed
 }

@@ -13,6 +13,8 @@ pub enum ApiError {
     InvalidInput(String),
     #[error("Deserialization error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Error while communicating to labrinth")]
+    Api(#[from] reqwest::Error),
 }
 
 impl actix_web::ResponseError for ApiError {
@@ -22,6 +24,7 @@ impl actix_web::ResponseError for ApiError {
             ApiError::Database(..) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::InvalidInput(..) => actix_web::http::StatusCode::BAD_REQUEST,
             ApiError::Json(..) => actix_web::http::StatusCode::BAD_REQUEST,
+            ApiError::Api(..) => actix_web::http::StatusCode::FAILED_DEPENDENCY,
         }
     }
 
@@ -32,6 +35,7 @@ impl actix_web::ResponseError for ApiError {
                 ApiError::Database(..) => "database_error",
                 ApiError::InvalidInput(..) => "invalid_input",
                 ApiError::Json(..) => "json_error",
+                ApiError::Api(..) => "api_error",
             },
             description: &self.to_string(),
         })
