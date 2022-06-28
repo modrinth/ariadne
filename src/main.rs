@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
     {
         let pool_ref = pool.clone();
         let analytics_queue_ref = analytics_queue.clone();
-        scheduler.run(Duration::from_secs(10), move || {
+        scheduler.run(Duration::from_secs(60 * 5), move || {
             let pool_ref = pool_ref.clone();
             let analytics_queue_ref = analytics_queue_ref.clone();
 
