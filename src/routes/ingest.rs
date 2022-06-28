@@ -9,8 +9,9 @@ use std::sync::Arc;
 use url::Url;
 
 #[derive(Deserialize)]
-pub struct UrlInput {
-    site_path: String,
+pub struct DownloadInput {
+    url: String,
+    project_id: String,
 }
 
 //Internal (can only be called with key) - protections are lax
@@ -18,20 +19,12 @@ pub struct UrlInput {
 #[post("v1/downloads", guard = "admin_key_guard")]
 pub async fn downloads_ingest(
     analytics_queue: web::Data<Arc<AnalyticsQueue>>,
-    url_input: web::Json<UrlInput>,
+    url_input: web::Json<DownloadInput>,
 ) -> Result<HttpResponse, ApiError> {
-    let url = Url::parse(&url_input.site_path)
+    let url = Url::parse(&url_input.url)
         .map_err(|_| ApiError::InvalidInput("invalid download URL specified!".to_string()))?;
 
-    let mut segments = url
-        .path_segments()
-        .ok_or_else(|| ApiError::InvalidInput("invalid download URL specified!".to_string()))?;
-
-    let id = segments
-        .nth(1)
-        .ok_or_else(|| ApiError::InvalidInput("invalid download URL specified!".to_string()))?;
-
-    let parsed = parse_base62(id)
+    let parsed = parse_base62(&url_input.project_id)
         .map_err(|_| ApiError::InvalidInput("invalid project ID in download URL!".to_string()))?;
 
     analytics_queue
@@ -62,13 +55,18 @@ pub async fn revenue_ingest(
     }
 
     let parsed = parse_base62(&revenue_input.project_id)
-        .map_err(|_| ApiError::InvalidInput("invalid project ID in download URL!".to_string()))?;
+        .map_err(|_| ApiError::InvalidInput("invalid project ID!".to_string()))?;
 
     analytics_queue
         .add_revenue(parsed, revenue_input.revenue)
         .await;
 
     Ok(HttpResponse::NoContent().body(""))
+}
+
+#[derive(Deserialize)]
+pub struct UrlInput {
+    url: String,
 }
 
 //this route should be behind the cloudflare WAF to prevent non-browsers from calling it
@@ -90,7 +88,7 @@ pub async fn page_view_ingest(
     }
     .unwrap_or_default();
 
-    let url = Url::parse(&url_input.site_path)
+    let url = Url::parse(&url_input.url)
         .map_err(|_| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
     if !req
@@ -138,7 +136,7 @@ pub async fn page_view_ingest(
                     analytics_queue
                         .add_view(
                             Some(parse_base62(&check_response.id).unwrap_or_default()),
-                            url_input.site_path.clone(),
+                            url.path().to_string(),
                         )
                         .await;
 
@@ -149,7 +147,7 @@ pub async fn page_view_ingest(
     }
 
     analytics_queue
-        .add_view(None, url_input.site_path.clone())
+        .add_view(None, url.path().to_string())
         .await;
 
     Ok(HttpResponse::NoContent().body(""))

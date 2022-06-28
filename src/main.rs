@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
     {
         let pool_ref = pool.clone();
         let analytics_queue_ref = analytics_queue.clone();
-        scheduler.run(Duration::from_secs(60 * 5), move || {
+        scheduler.run(Duration::from_secs(10), move || {
             let pool_ref = pool_ref.clone();
             let analytics_queue_ref = analytics_queue_ref.clone();
 
@@ -121,6 +121,7 @@ async fn main() -> std::io::Result<()> {
             .service(index::index_get)
             .service(ingest::revenue_ingest)
             .service(ingest::downloads_ingest)
+            .service(ingest::page_view_ingest)
     })
     .bind(dotenv::var("BIND_ADDR").unwrap())?
     .run()

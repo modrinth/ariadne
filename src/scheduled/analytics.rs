@@ -74,10 +74,10 @@ impl AnalyticsQueue {
     pub async fn index(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
         //TODO: This double allocates all of the queues. Could be avoided, not sure how.
         let views_queue = self.views_queue.clone();
-        self.downloads_queue.clear();
+        self.views_queue.clear();
 
         let downloads_queue = self.downloads_queue.clone();
-        self.views_queue.clear();
+        self.downloads_queue.clear();
 
         let revenue_queue = self.revenue_queue.clone();
         self.revenue_queue.clear();
