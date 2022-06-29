@@ -7,7 +7,7 @@
       "parameters": {
         "Left": [
           "Int4",
-          "Varchar",
+          "Int8",
           "Varchar"
         ]
       },
@@ -21,7 +21,7 @@
       "parameters": {
         "Left": [
           "Int4",
-          "Varchar",
+          "Int8",
           "Varchar"
         ]
       },
@@ -35,7 +35,7 @@
       "parameters": {
         "Left": [
           "Float4",
-          "Varchar"
+          "Int8"
         ]
       },
       "nullable": []
