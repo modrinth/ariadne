@@ -81,6 +81,7 @@ pub async fn page_view_ingest(
 
     let conn_info = req.connection_info();
 
+    println!("aaaa");
     let ip = if let Some(header) = req.headers().get("CF-Connecting-IP") {
         header.to_str().ok()
     } else {
@@ -103,7 +104,7 @@ pub async fn page_view_ingest(
         .and_then(|x| x.to_str().ok())
         .map(|x| x == &*admin_key)
         .unwrap_or_default()
-        || !rate_limit_queue
+        && !rate_limit_queue
             .add(ip.to_string(), url.path().to_string())
             .await
     {

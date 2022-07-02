@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod index;
 pub mod ingest;
+pub mod query;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ApiError {
