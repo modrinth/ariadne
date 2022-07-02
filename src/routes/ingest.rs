@@ -91,6 +91,12 @@ pub async fn page_view_ingest(
     let url = Url::parse(&url_input.url)
         .map_err(|_| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
+    let domain = url.domain().ok_or_else(|| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
+
+    if !(domain.ends_with(".modrinth.com") || domain == "modrinth.com") {
+        return Err(ApiError::InvalidInput("invalid page view URL specified!".to_string()));
+    }
+
     if !req
         .headers()
         .get(crate::guards::ADMIN_KEY_HEADER)

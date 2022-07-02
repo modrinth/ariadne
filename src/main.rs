@@ -103,7 +103,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 Cors::default()
                     .allowed_origin_fn(|origin, _req_head| {
-                        parse_strings_from_var("ALLOWED_CALLBACK_URLS")
+                        parse_strings_from_var("CORS_ALLOWED_ORIGINS")
                             .unwrap_or_default()
                             .contains(&origin.to_str().unwrap_or_default().to_string())
                     })
@@ -148,8 +148,6 @@ fn check_env_vars() -> bool {
         warn!("Variable `CORS_ALLOWED_ORIGINS` missing in dotenv or not a json array of strings");
         failed |= true;
     }
-
-    failed |= check_var::<String>("BIND_ADDR");
 
     failed |= check_var::<String>("DATABASE_URL");
 
