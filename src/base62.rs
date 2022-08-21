@@ -11,21 +11,6 @@ pub enum DecodingError {
     Overflow,
 }
 
-const BASE62_CHARS: [u8; 62] = *b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-
-pub fn to_base62(mut num: u64) -> String {
-    let length = (num as f64).log(62.0).ceil() as usize;
-    let mut output = String::with_capacity(length);
-
-    while num > 0 {
-        // Could be done more efficiently, but requires byte
-        // manipulation of strings & Vec<u8> -> String conversion
-        output.insert(0, BASE62_CHARS[(num % 62) as usize] as char);
-        num /= 62;
-    }
-    output
-}
-
 pub fn parse_base62(string: &str) -> Result<u64, DecodingError> {
     let mut num: u64 = 0;
     for c in string.chars() {

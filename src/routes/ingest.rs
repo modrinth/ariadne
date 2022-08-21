@@ -2,8 +2,10 @@ use crate::base62::parse_base62;
 use crate::guards::admin_key_guard;
 use crate::routes::ApiError;
 use crate::{AnalyticsQueue, RateLimitQueue};
+use actix_web::http::header::USER_AGENT;
 use actix_web::{post, web};
 use actix_web::{HttpRequest, HttpResponse};
+use isbot::Bots;
 use serde::Deserialize;
 use std::sync::Arc;
 use url::Url;
@@ -75,27 +77,37 @@ pub async fn page_view_ingest(
     req: HttpRequest,
     rate_limit_queue: web::Data<Arc<RateLimitQueue>>,
     analytics_queue: web::Data<Arc<AnalyticsQueue>>,
+    bots: web::Data<Arc<Bots>>,
     url_input: web::Json<UrlInput>,
 ) -> Result<HttpResponse, ApiError> {
     let admin_key = dotenv::var("ARIADNE_ADMIN_KEY")?;
 
-    let conn_info = req.connection_info();
+    if let Some(user_agent) = req.headers().get(USER_AGENT).and_then(|x| x.to_str().ok()) {
+        if bots.is_bot(user_agent) {
+            return Ok(HttpResponse::NoContent().body(""));
+        }
+    }
 
-    println!("aaaa");
+    let conn_info = req.connection_info().peer_addr().map(|x| x.to_string());
+
     let ip = if let Some(header) = req.headers().get("CF-Connecting-IP") {
         header.to_str().ok()
     } else {
-        conn_info.peer_addr()
+        conn_info.as_deref()
     }
     .unwrap_or_default();
 
     let url = Url::parse(&url_input.url)
         .map_err(|_| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
-    let domain = url.domain().ok_or_else(|| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
+    let domain = url
+        .domain()
+        .ok_or_else(|| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
     if !(domain.ends_with(".modrinth.com") || domain == "modrinth.com") {
-        return Err(ApiError::InvalidInput("invalid page view URL specified!".to_string()));
+        return Err(ApiError::InvalidInput(
+            "invalid page view URL specified!".to_string(),
+        ));
     }
 
     if !req
@@ -153,9 +165,7 @@ pub async fn page_view_ingest(
         }
     }
 
-    analytics_queue
-        .add_view(None, url.path().to_string())
-        .await;
+    analytics_queue.add_view(None, url.path().to_string()).await;
 
     Ok(HttpResponse::NoContent().body(""))
 }

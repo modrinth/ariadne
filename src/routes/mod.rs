@@ -16,6 +16,8 @@ pub enum ApiError {
     Json(#[from] serde_json::Error),
     #[error("Error while communicating to labrinth")]
     Api(#[from] reqwest::Error),
+    #[error("Invalid Authentication Credentials: {0}")]
+    Authentication(String),
 }
 
 impl actix_web::ResponseError for ApiError {
@@ -26,6 +28,7 @@ impl actix_web::ResponseError for ApiError {
             ApiError::InvalidInput(..) => actix_web::http::StatusCode::BAD_REQUEST,
             ApiError::Json(..) => actix_web::http::StatusCode::BAD_REQUEST,
             ApiError::Api(..) => actix_web::http::StatusCode::FAILED_DEPENDENCY,
+            ApiError::Authentication(..) => actix_web::http::StatusCode::UNAUTHORIZED,
         }
     }
 
@@ -37,6 +40,7 @@ impl actix_web::ResponseError for ApiError {
                 ApiError::InvalidInput(..) => "invalid_input",
                 ApiError::Json(..) => "json_error",
                 ApiError::Api(..) => "api_error",
+                ApiError::Authentication(..) => "authentication_error",
             },
             description: &self.to_string(),
         })

@@ -1,44 +1,325 @@
 {
   "db": "PostgreSQL",
+  "00b7a397f86ad26321a4bcb755bb4124b5eb0cf785a295a6778234cf1b23a98e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "page_views",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(views) page_views, date_trunc($4, recorded) as recorded_date\n                FROM views\n                WHERE views.project_id = $3 AND (views.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
+  "017858fa64500316308e5e6afb05e4ee2932e457ada839815d38858285b197e7": {
+    "describe": {
+      "columns": [
+        {
+          "name": "money_value",
+          "ordinal": 0,
+          "type_info": "Float4"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(money) money_value, date_trunc($4, recorded) as recorded_date\n                FROM revenue\n                WHERE revenue.project_id = $3 AND (revenue.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
+  "1b609d4e36da955c1a5858fc2f7308ede0f7edfc65830fc918d5e2a6e839deb8": {
+    "describe": {
+      "columns": [
+        {
+          "name": "money_value",
+          "ordinal": 0,
+          "type_info": "Float4"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(money) money_value, date_trunc($3, recorded) as recorded_date\n                FROM revenue\n                WHERE (revenue.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
+  "2b0410894a2f49a4ac281c7741a9919a8aa68de679d787c91c5f538eb498fb9e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "page_views",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(views) page_views, date_trunc($3, recorded) as recorded_date\n                FROM views\n                WHERE (views.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
+  "3d792338b454da9afbfcbfa10abd241a2413f9f6bab2763411bd2417dc13a692": {
+    "describe": {
+      "columns": [
+        {
+          "name": "page_views",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "site_path",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        null,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(views) page_views, site_path\n                FROM views\n                WHERE (views.recorded BETWEEN $1 AND $2)\n                GROUP BY site_path\n                ORDER BY page_views DESC\n                LIMIT 15\n                "
+  },
+  "57b3f64b80137fb86875b1794f1857b56f261ab444e96f446ccb289d7baaeec3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "page_views",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "site_path",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        null,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(views) page_views, site_path\n                FROM views\n                WHERE views.project_id = $3 AND (views.recorded BETWEEN $1 AND $2)\n                GROUP BY site_path\n                ORDER BY page_views DESC\n                LIMIT 15\n                "
+  },
+  "6fbfa62e06f3d45cac4cf0cf854d7aab669685137ea9ce1294fa0883f871995f": {
+    "describe": {
+      "columns": [
+        {
+          "name": "downloads_value",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(downloads) downloads_value, date_trunc($3, recorded) as recorded_date\n                FROM downloads\n                WHERE (downloads.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
   "807374fe0f07a721eed81411c832d485275a181dd069257e18802d401e4b754e": {
-    "query": "\n                    INSERT INTO views (views, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Int4",
           "Int8",
           "Varchar"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n                    INSERT INTO views (views, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    "
   },
   "8c38e262a5bd50a7e2e6a20ae6d6c17503d4e0da7e9477ca409e84ba3a4d67ab": {
-    "query": "\n                    INSERT INTO downloads (downloads, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Int4",
           "Int8",
           "Varchar"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n                    INSERT INTO downloads (downloads, project_id, site_path)\n                    VALUES ($1, $2, $3)\n                    "
   },
   "a6ab7057158132b982d60d0e6dc81cf597851e66928015043bca9ddad621dc50": {
-    "query": "\n                    INSERT INTO revenue (money, project_id)\n                    VALUES ($1, $2)\n                    ",
     "describe": {
       "columns": [],
+      "nullable": [],
       "parameters": {
         "Left": [
           "Float4",
           "Int8"
         ]
-      },
-      "nullable": []
-    }
+      }
+    },
+    "query": "\n                    INSERT INTO revenue (money, project_id)\n                    VALUES ($1, $2)\n                    "
+  },
+  "cc947ca9ed32c0e57d5b2f87b5ab7bb652836c40a7d9eada1c782d19e250c955": {
+    "describe": {
+      "columns": [
+        {
+          "name": "downloads_value",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "site_path",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        null,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(downloads) downloads_value, site_path\n                FROM downloads\n                WHERE (downloads.recorded BETWEEN $1 AND $2)\n                GROUP BY site_path\n                ORDER BY downloads_value DESC\n                LIMIT 15\n                "
+  },
+  "ce34ad22624280b959bcca8005d57a853d03b4e4e59fdd2293a0cbfe122eddf2": {
+    "describe": {
+      "columns": [
+        {
+          "name": "downloads_value",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "recorded_date",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Int8",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(downloads) downloads_value, date_trunc($4, recorded) as recorded_date\n                FROM downloads\n                WHERE downloads.project_id = $3 AND (downloads.recorded BETWEEN $1 AND $2)\n                GROUP BY recorded_date\n                ORDER BY 2 ASC;\n                "
+  },
+  "d5f1e685865852852a2102f3599157313ede5930989ffc69499614e9e7aba532": {
+    "describe": {
+      "columns": [
+        {
+          "name": "downloads_value",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "site_path",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        null,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Timestamptz",
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n                SELECT SUM(downloads) downloads_value, site_path\n                FROM downloads\n                WHERE downloads.project_id = $3 AND (downloads.recorded BETWEEN $1 AND $2)\n                GROUP BY site_path\n                ORDER BY downloads_value DESC\n                LIMIT 15\n                "
   }
 }

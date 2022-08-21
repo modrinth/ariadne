@@ -1,3 +1,4 @@
+mod auth;
 mod base62;
 mod guards;
 mod routes;
@@ -6,11 +7,13 @@ mod util;
 
 use crate::routes::index;
 use crate::routes::ingest;
+use crate::routes::query;
 use crate::scheduled::analytics::AnalyticsQueue;
 use crate::scheduled::ratelimit::RateLimitQueue;
 use crate::util::{parse_strings_from_var, parse_var};
 use actix_cors::Cors;
 use actix_web::{http, web, App, HttpServer};
+use isbot::Bots;
 use log::{error, info, warn};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -96,6 +99,8 @@ async fn main() -> std::io::Result<()> {
         });
     }
 
+    let bots = Arc::new(Bots::default());
+
     info!("Starting Actix HTTP server!");
 
     HttpServer::new(move || {
@@ -118,10 +123,14 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(analytics_queue.clone()))
             .app_data(web::Data::new(rate_limit_queue.clone()))
+            .app_data(web::Data::new(bots.clone()))
             .service(index::index_get)
             .service(ingest::revenue_ingest)
             .service(ingest::downloads_ingest)
             .service(ingest::page_view_ingest)
+            .service(query::views_query)
+            .service(query::downloads_query)
+            .service(query::revenue_query)
     })
     .bind(dotenv::var("BIND_ADDR").unwrap())?
     .run()
