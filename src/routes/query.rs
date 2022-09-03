@@ -7,6 +7,32 @@ use crate::auth::check_is_authorized;
 use crate::base62::parse_base62;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy, Deserialize, PartialOrd, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Resolution {
+    FiveMinutes,
+    FifteenMinutes,
+    OneHour,
+    SixHours,
+    OneDay,
+    OneWeek,
+    OneMonth,
+}
+
+impl Resolution {
+    pub fn convert_to_postgres(&self) -> &'static str {
+        match self {
+            Resolution::FiveMinutes => "1 minute",
+            Resolution::FifteenMinutes => "15 minutes",
+            Resolution::OneHour => "1 hour",
+            Resolution::SixHours => "6 hours",
+            Resolution::OneDay => "1 day",
+            Resolution::OneWeek => "1 week",
+            Resolution::OneMonth => "1 month",
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct AnalyticsQuery {
     // mandatory for non-admins
@@ -15,6 +41,7 @@ pub struct AnalyticsQuery {
     start_date: DateTime<Utc>,
     #[serde(default = "Utc::now")]
     end_date: DateTime<Utc>,
+    resolution: Option<Resolution>,
 }
 
 fn start_interval_default() -> DateTime<Utc> {
@@ -44,7 +71,7 @@ async fn perform_analytics_checks(
     query: &AnalyticsQuery,
     req: &HttpRequest,
     use_payouts_permission: bool,
-) -> Result<String, ApiError> {
+) -> Result<&'static str, ApiError> {
     check_is_authorized(
         query.project_id.as_deref(),
         req.headers(),
@@ -60,18 +87,28 @@ async fn perform_analytics_checks(
         ));
     }
 
-    Ok(if interval > (270 * 24 * 60 * 60) {
-        "month"
+    let min_resolution = if interval > (2 * 365 * 24 * 60 * 60) {
+        Resolution::OneWeek
     } else if interval > (90 * 24 * 60 * 60) {
-        "week"
+        Resolution::OneDay
     } else if interval > (30 * 24 * 60 * 60) {
-        "day"
+        Resolution::OneHour
     } else if interval > (7 * 24 * 60 * 60) {
-        "hour"
+        Resolution::FifteenMinutes
     } else {
-        "minute"
+        Resolution::FiveMinutes
+    };
+
+    Ok(if let Some(resolution) = &query.resolution {
+        if resolution > &min_resolution {
+            min_resolution
+        } else {
+            *resolution
+        }
+    } else {
+        min_resolution
     }
-    .to_string())
+    .convert_to_postgres())
 }
 
 #[get("v1/views")]
@@ -112,7 +149,7 @@ pub async fn views_query(
             .try_collect::<Vec<TopValue<u32>>>(),
             sqlx::query!(
                 "
-                SELECT SUM(views) page_views, date_trunc($4, recorded) as recorded_date
+                SELECT SUM(views) page_views, date_bin($4::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM views
                 WHERE views.project_id = $3 AND (views.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date
@@ -157,7 +194,7 @@ pub async fn views_query(
             .try_collect::<Vec<TopValue<u32>>>(),
             sqlx::query!(
                 "
-                SELECT SUM(views) page_views, date_trunc($3, recorded) as recorded_date
+                SELECT SUM(views) page_views, date_bin($3::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM views
                 WHERE (views.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date
@@ -223,7 +260,7 @@ pub async fn downloads_query(
             .try_collect::<Vec<TopValue<u32>>>(),
             sqlx::query!(
                 "
-                SELECT SUM(downloads) downloads_value, date_trunc($4, recorded) as recorded_date
+                SELECT SUM(downloads) downloads_value, date_bin($4::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM downloads
                 WHERE downloads.project_id = $3 AND (downloads.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date
@@ -268,7 +305,7 @@ pub async fn downloads_query(
             .try_collect::<Vec<TopValue<u32>>>(),
             sqlx::query!(
                 "
-                SELECT SUM(downloads) downloads_value, date_trunc($3, recorded) as recorded_date
+                SELECT SUM(downloads) downloads_value, date_bin($3::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM downloads
                 WHERE (downloads.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date
@@ -314,7 +351,7 @@ pub async fn revenue_query(
             Vec::new(),
             sqlx::query!(
                 "
-                SELECT SUM(money) money_value, date_trunc($4, recorded) as recorded_date
+                SELECT SUM(money) money_value, date_bin($4::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM revenue
                 WHERE revenue.project_id = $3 AND (revenue.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date
@@ -340,7 +377,7 @@ pub async fn revenue_query(
             Vec::new(),
             sqlx::query!(
                 "
-                SELECT SUM(money) money_value, date_trunc($3, recorded) as recorded_date
+                SELECT SUM(money) money_value, date_bin($3::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
                 FROM revenue
                 WHERE (revenue.recorded BETWEEN $1 AND $2)
                 GROUP BY recorded_date

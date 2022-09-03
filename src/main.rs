@@ -107,10 +107,16 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(
                 Cors::default()
-                    .allowed_origin_fn(|origin, _req_head| {
-                        parse_strings_from_var("CORS_ALLOWED_ORIGINS")
-                            .unwrap_or_default()
-                            .contains(&origin.to_str().unwrap_or_default().to_string())
+                    .allowed_origin_fn(|origin, req_head| {
+                        if ["/v1/views", "/v1/downloads", "/v1/revenue"]
+                            .contains(&req_head.uri.path())
+                        {
+                            true
+                        } else {
+                            parse_strings_from_var("CORS_ALLOWED_ORIGINS")
+                                .unwrap_or_default()
+                                .contains(&origin.to_str().unwrap_or_default().to_string())
+                        }
                     })
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec![
@@ -125,12 +131,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(rate_limit_queue.clone()))
             .app_data(web::Data::new(bots.clone()))
             .service(index::index_get)
-            .service(ingest::revenue_ingest)
-            .service(ingest::downloads_ingest)
-            .service(ingest::page_view_ingest)
             .service(query::views_query)
             .service(query::downloads_query)
             .service(query::revenue_query)
+            .service(ingest::revenue_ingest)
+            .service(ingest::downloads_ingest)
+            .service(ingest::page_view_ingest)
     })
     .bind(dotenv::var("BIND_ADDR").unwrap())?
     .run()
