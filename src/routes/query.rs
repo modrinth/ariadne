@@ -1,11 +1,14 @@
+use std::collections::HashMap;
 use crate::routes::ApiError;
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
 
 use crate::auth::check_is_authorized;
 use crate::base62::parse_base62;
+use crate::guards::admin_key_guard;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Clone, Copy, Deserialize, PartialOrd, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -14,6 +17,7 @@ pub enum Resolution {
     FifteenMinutes,
     OneHour,
     SixHours,
+    TwelveHours,
     OneDay,
     OneWeek,
     OneMonth,
@@ -26,6 +30,7 @@ impl Resolution {
             Resolution::FifteenMinutes => "15 minutes",
             Resolution::OneHour => "1 hour",
             Resolution::SixHours => "6 hours",
+            Resolution::TwelveHours => "12 hours",
             Resolution::OneDay => "1 day",
             Resolution::OneWeek => "1 week",
             Resolution::OneMonth => "1 month",
@@ -100,7 +105,7 @@ async fn perform_analytics_checks(
     };
 
     Ok(if let Some(resolution) = &query.resolution {
-        if resolution > &min_resolution {
+        if resolution < &min_resolution {
             min_resolution
         } else {
             *resolution
@@ -222,7 +227,7 @@ pub async fn views_query(
     }))
 }
 
-#[get("v1/downloads")]
+#[get("v1/downloads", guard = "admin_key_guard")]
 pub async fn downloads_query(
     web::Query(query): web::Query<AnalyticsQuery>,
     req: HttpRequest,
@@ -333,74 +338,54 @@ pub async fn downloads_query(
     }))
 }
 
-#[get("v1/revenue")]
-pub async fn revenue_query(
-    web::Query(query): web::Query<AnalyticsQuery>,
-    req: HttpRequest,
+#[derive(Deserialize)]
+pub struct MultipliersQuery {
+    start_date: DateTime<Utc>,
+}
+
+/// Internal route - retrieves payout multipliers for each day
+#[get("v1/multipliers")]
+pub async fn multipliers_query(
+    web::Query(query): web::Query<MultipliersQuery>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ApiError> {
-    let value = perform_analytics_checks(&query, &req, false).await?;
+    let start = query.start_date.date().and_hms(0, 0, 0);
+    let end = start + Duration::days(1);
+
+    println!("start: {} end: {}", start, end);
 
     use futures::TryStreamExt;
 
-    let (top_values, time_series) = if let Some(project_id) = query.project_id {
-        let parsed = parse_base62(&project_id)
-            .map_err(|_| ApiError::InvalidInput("invalid project ID!".to_string()))?;
-
-        (
-            Vec::new(),
-            sqlx::query!(
-                "
-                SELECT SUM(money) money_value, date_bin($4::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
-                FROM revenue
-                WHERE revenue.project_id = $3 AND (revenue.recorded BETWEEN $1 AND $2)
-                GROUP BY recorded_date
-                ORDER BY 2 ASC;
-                ",
-                query.start_date,
-                query.end_date,
-                parsed as i64,
-                value
-            )
-            .fetch_many(&**pool)
-            .try_filter_map(|e| async {
-                Ok(e.right().map(|v| TimeSeriesValue {
-                    value: v.money_value.unwrap_or_default() as f32,
-                    recorded: v.recorded_date.unwrap_or_else(Utc::now),
-                }))
-            })
-            .try_collect::<Vec<TimeSeriesValue<f32>>>()
-            .await?,
+    let (values, sum) = futures::future::try_join(
+        sqlx::query!(
+            "
+            SELECT SUM(views) page_views, project_id
+            FROM views
+            WHERE views.recorded BETWEEN $1 AND $2
+            GROUP BY project_id
+            ORDER BY page_views DESC
+            ",
+            start,
+            end,
         )
-    } else {
-        (
-            Vec::new(),
-            sqlx::query!(
-                "
-                SELECT SUM(money) money_value, date_bin($3::text::interval, recorded, TIMESTAMP '2001-01-01') as recorded_date
-                FROM revenue
-                WHERE (revenue.recorded BETWEEN $1 AND $2)
-                GROUP BY recorded_date
-                ORDER BY 2 ASC;
-                ",
-                query.start_date,
-                query.end_date,
-                value
-            )
-            .fetch_many(&**pool)
-            .try_filter_map(|e| async {
-                Ok(e.right().map(|v| TimeSeriesValue {
-                    value: v.money_value.unwrap_or_default() as f32,
-                    recorded: v.recorded_date.unwrap_or_else(Utc::now),
-                }))
-            })
-            .try_collect::<Vec<TimeSeriesValue<f32>>>()
-            .await?,
+        .fetch_many(&**pool)
+        .try_filter_map(|e| async { Ok(e.right().map(|r| (r.project_id.unwrap_or_default(), r.page_views.unwrap_or_default()))) })
+        .try_collect::<HashMap<i64, i64>>(),
+        sqlx::query!(
+            "
+            SELECT SUM(views) page_views
+            FROM views
+            WHERE views.recorded BETWEEN $1 AND $2
+            ",
+            start,
+            end,
         )
-    };
+        .fetch_one(&**pool)
+    )
+    .await?;
 
-    Ok(HttpResponse::Ok().json(AnalyticsResponse {
-        top_values,
-        time_series,
-    }))
+    Ok(HttpResponse::Ok().json(json! ({
+        "sum": sum.page_views.unwrap_or_default(),
+        "values": values
+    })))
 }

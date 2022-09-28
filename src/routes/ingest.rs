@@ -37,36 +37,6 @@ pub async fn downloads_ingest(
 }
 
 #[derive(Deserialize)]
-pub struct RevenueInput {
-    project_id: String,
-    revenue: f32,
-}
-
-//Internal (can only be called with key) - protections are lax
-//called from ads payouts provider. TODO: figure out how to record this
-//route may be obsolete depending on what ads provider is used
-#[post("v1/revenue", guard = "admin_key_guard")]
-pub async fn revenue_ingest(
-    analytics_queue: web::Data<Arc<AnalyticsQueue>>,
-    revenue_input: web::Json<RevenueInput>,
-) -> Result<HttpResponse, ApiError> {
-    if revenue_input.revenue > 5.0 {
-        return Err(ApiError::InvalidInput(
-            "revenue exceeds individual request allowance!".to_string(),
-        ));
-    }
-
-    let parsed = parse_base62(&revenue_input.project_id)
-        .map_err(|_| ApiError::InvalidInput("invalid project ID!".to_string()))?;
-
-    analytics_queue
-        .add_revenue(parsed, revenue_input.revenue)
-        .await;
-
-    Ok(HttpResponse::NoContent().body(""))
-}
-
-#[derive(Deserialize)]
 pub struct UrlInput {
     url: String,
 }

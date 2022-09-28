@@ -108,9 +108,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 Cors::default()
                     .allowed_origin_fn(|origin, req_head| {
-                        if ["/v1/views", "/v1/downloads", "/v1/revenue"]
-                            .contains(&req_head.uri.path())
-                        {
+                        if ["/v1/views", "/v1/downloads"].contains(&req_head.uri.path()) {
                             true
                         } else {
                             parse_strings_from_var("CORS_ALLOWED_ORIGINS")
@@ -133,8 +131,7 @@ async fn main() -> std::io::Result<()> {
             .service(index::index_get)
             .service(query::views_query)
             .service(query::downloads_query)
-            .service(query::revenue_query)
-            .service(ingest::revenue_ingest)
+            .service(query::multipliers_query)
             .service(ingest::downloads_ingest)
             .service(ingest::page_view_ingest)
     })
