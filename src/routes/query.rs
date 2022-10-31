@@ -116,7 +116,7 @@ async fn perform_analytics_checks(
     .convert_to_postgres())
 }
 
-#[get("v1/views")]
+#[get("v1/views", guard = "admin_key_guard")]
 pub async fn views_query(
     web::Query(query): web::Query<AnalyticsQuery>,
     req: HttpRequest,
