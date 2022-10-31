@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use crate::routes::ApiError;
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
+use std::collections::HashMap;
 
 use crate::auth::check_is_authorized;
 use crate::base62::parse_base62;
@@ -344,7 +344,7 @@ pub struct MultipliersQuery {
 }
 
 /// Internal route - retrieves payout multipliers for each day
-#[get("v1/multipliers")]
+#[get("v1/multipliers", guard = "admin_key_guard")]
 pub async fn multipliers_query(
     web::Query(query): web::Query<MultipliersQuery>,
     pool: web::Data<PgPool>,
@@ -369,7 +369,14 @@ pub async fn multipliers_query(
             end,
         )
         .fetch_many(&**pool)
-        .try_filter_map(|e| async { Ok(e.right().map(|r| (r.project_id.unwrap_or_default(), r.page_views.unwrap_or_default()))) })
+        .try_filter_map(|e| async {
+            Ok(e.right().map(|r| {
+                (
+                    r.project_id.unwrap_or_default(),
+                    r.page_views.unwrap_or_default(),
+                )
+            }))
+        })
         .try_collect::<HashMap<i64, i64>>(),
         sqlx::query!(
             "
@@ -380,7 +387,7 @@ pub async fn multipliers_query(
             start,
             end,
         )
-        .fetch_one(&**pool)
+        .fetch_one(&**pool),
     )
     .await?;
 
