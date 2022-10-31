@@ -85,7 +85,7 @@ impl AnalyticsQueue {
                     INSERT INTO downloads (downloads, project_id, site_path)
                     VALUES ($1, $2, $3)
                     ",
-                    value as u32,
+                    value as i32,
                     key.project_id as i64,
                     key.site_path,
                 )

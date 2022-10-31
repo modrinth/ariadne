@@ -18,7 +18,7 @@ url = "2.2.2"
 
 thiserror = "1.0"
 
-sqlx = { version = "0.5.11", features = ["runtime-actix-rustls", "postgres", "chrono", "offline", "macros", "migrate"] }
+sqlx = { version = "0.6.2", features = ["runtime-actix-rustls", "postgres", "chrono", "offline", "macros", "migrate"] }
 
 dotenv = "0.15.0"
 
