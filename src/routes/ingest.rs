@@ -99,7 +99,7 @@ pub async fn page_view_ingest(
 
         if segments_vec.len() >= 2 {
             //todo: fetch from labrinth periodically when route exists
-            const PROJECT_TYPES: &[&str] = &["mod", "modpack"];
+            const PROJECT_TYPES: &[&str] = &["mod", "modpack", "plugin", "resourcepack"];
 
             if PROJECT_TYPES.contains(&segments_vec[0]) {
                 #[derive(Deserialize)]
