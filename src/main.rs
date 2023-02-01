@@ -29,6 +29,18 @@ async fn main() -> std::io::Result<()> {
         ));
     }
 
+    let sentry = sentry::init(sentry::ClientOptions {
+        release: sentry::release_name!(),
+        traces_sample_rate: 0.1,
+        enable_profiling: true,
+        profiles_sample_rate: 0.1,
+        ..Default::default()
+    });
+    if sentry.is_enabled() {
+        info!("Enabled Sentry integration");
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
     info!("Initializing database connection");
     let client = db::init_client().await.unwrap();
 
@@ -100,6 +112,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(analytics_queue.clone()))
             .app_data(web::Data::new(client.clone()))
             .app_data(web::Data::new(reader.clone()))
+            .wrap(sentry_actix::Sentry::new())
             .service(index::index_get)
             .service(query::multipliers_query)
             .service(ingest::downloads_ingest)

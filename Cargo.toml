@@ -1,6 +1,6 @@
 [package]
 name = "ariadne"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -35,3 +35,6 @@ dashmap = "5.3.4"
 reqwest = { version = "0.11", features = ["json"] }
 hyper = { version = "0.14", features = ["full"] }
 hyper-tls = "0.5.0"
+
+sentry = { version = "0.29.2", features = ["profiling"] }
+sentry-actix = "0.29.2"
