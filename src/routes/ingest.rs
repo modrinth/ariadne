@@ -3,6 +3,7 @@ use crate::models::views::PageView;
 use crate::routes::ApiError;
 use crate::scheduled::maxmind::MaxMindIndexer;
 use crate::util::base62::parse_base62;
+use crate::util::env::parse_strings_from_var;
 use crate::util::guards::admin_key_guard;
 use crate::AnalyticsQueue;
 use actix_web::{post, web};
@@ -110,7 +111,10 @@ pub async fn page_view_ingest(
         .host_str()
         .ok_or_else(|| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
-    if !(domain.ends_with(".modrinth.com") || domain == "modrinth.com") {
+    let allowed_origins = parse_strings_from_var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
+    if !(domain.ends_with(".modrinth.com") || domain == "modrinth.com")
+        || allowed_origins.contains(&"*".to_string())
+    {
         return Err(ApiError::InvalidInput(
             "invalid page view URL specified!".to_string(),
         ));
