@@ -1,4 +1,4 @@
-FROM rust:1.59.0 as build
+FROM rust:1.65 as build
 ENV PKG_CONFIG_ALLOW_CROSS=1
 
 WORKDIR /usr/src/ariadne
@@ -9,7 +9,6 @@ COPY . .
 ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.9.0/wait /wait
 RUN chmod +x /wait
 # Build our code
-ARG SQLX_OFFLINE=true
 RUN cargo build --release
 
 
@@ -23,7 +22,6 @@ RUN apt-get update \
 RUN update-ca-certificates
 
 COPY --from=build /usr/src/ariadne/target/release/ariadne /ariadne/ariadne
-COPY --from=build /usr/src/ariadne/migrations/* /ariadne/migrations/
 COPY --from=build /wait /wait
 WORKDIR /ariadne
 

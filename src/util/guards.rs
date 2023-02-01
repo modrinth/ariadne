@@ -2,7 +2,7 @@ use actix_web::guard::GuardContext;
 
 pub const ADMIN_KEY_HEADER: &str = "Modrinth-Admin";
 pub fn admin_key_guard(ctx: &GuardContext) -> bool {
-    let admin_key = dotenv::var("ARIADNE_ADMIN_KEY").expect("No admin key provided!");
+    let admin_key = dotenvy::var("ARIADNE_ADMIN_KEY").expect("No admin key provided!");
 
     ctx.head()
         .headers()

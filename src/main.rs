@@ -1,6 +1,5 @@
-mod auth;
-mod base62;
-mod guards;
+mod db;
+mod models;
 mod routes;
 mod scheduled;
 mod util;
@@ -9,19 +8,16 @@ use crate::routes::index;
 use crate::routes::ingest;
 use crate::routes::query;
 use crate::scheduled::analytics::AnalyticsQueue;
-use crate::scheduled::ratelimit::RateLimitQueue;
-use crate::util::{parse_strings_from_var, parse_var};
+use crate::util::env::{parse_strings_from_var, parse_var};
 use actix_cors::Cors;
 use actix_web::{http, web, App, HttpServer};
-use isbot::Bots;
 use log::{error, info, warn};
-use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use std::time::Duration;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     if check_env_vars() {
@@ -34,45 +30,42 @@ async fn main() -> std::io::Result<()> {
     }
 
     info!("Initializing database connection");
-    let database_url = dotenv::var("DATABASE_URL").expect("`DATABASE_URL` not in .env");
-
-    let pool = PgPoolOptions::new()
-        .min_connections(
-            dotenv::var("DATABASE_MIN_CONNECTIONS")
-                .ok()
-                .and_then(|x| x.parse().ok())
-                .unwrap_or(0),
-        )
-        .max_connections(
-            dotenv::var("DATABASE_MAX_CONNECTIONS")
-                .ok()
-                .and_then(|x| x.parse().ok())
-                .unwrap_or(16),
-        )
-        .max_lifetime(Some(Duration::from_secs(60 * 60)))
-        .connect(&database_url)
-        .await
-        .expect("Database connection failed");
-
-    sqlx::migrate!()
-        .run(&pool)
-        .await
-        .expect("Error while applying database migrations.");
+    let client = db::init_client().await.unwrap();
 
     let mut scheduler = scheduled::scheduler::Scheduler::new();
 
-    let analytics_queue = Arc::new(AnalyticsQueue::new());
-
+    info!("Downloading MaxMind GeoLite2 country database");
+    let reader = Arc::new(scheduled::maxmind::MaxMindIndexer::new().await.unwrap());
     {
-        let pool_ref = pool.clone();
+        let reader_ref = reader.clone();
+        scheduler.run(Duration::from_secs(60 * 60 * 24), move || {
+            let reader_ref = reader_ref.clone();
+
+            async move {
+                info!("Downloading MaxMind GeoLite2 country database");
+                let result = reader_ref.index().await;
+                if let Err(e) = result {
+                    warn!(
+                        "Downloading MaxMind GeoLite2 country database failed: {:?}",
+                        e
+                    );
+                }
+                info!("Done downloading MaxMind GeoLite2 country database");
+            }
+        });
+    }
+
+    let analytics_queue = Arc::new(AnalyticsQueue::new());
+    {
+        let client_ref = client.clone();
         let analytics_queue_ref = analytics_queue.clone();
         scheduler.run(Duration::from_secs(60 * 5), move || {
-            let pool_ref = pool_ref.clone();
+            let client_ref = client_ref.clone();
             let analytics_queue_ref = analytics_queue_ref.clone();
 
             async move {
                 info!("Indexing analytics queue");
-                let result = analytics_queue_ref.index(&pool_ref).await;
+                let result = analytics_queue_ref.index(client_ref).await;
                 if let Err(e) = result {
                     warn!("Indexing analytics queue failed: {:?}", e);
                 }
@@ -80,26 +73,6 @@ async fn main() -> std::io::Result<()> {
             }
         });
     }
-
-    let rate_limit_queue = Arc::new(RateLimitQueue::new(
-        dotenv::var("PEPPER").expect("Pepper not supplied in env variables!"),
-    ));
-
-    {
-        let rate_limit_queue_ref = rate_limit_queue.clone();
-
-        scheduler.run(Duration::from_secs(60 * 60), move || {
-            let rate_limit_queue_ref = rate_limit_queue_ref.clone();
-
-            async move {
-                info!("Indexing rate limit queue");
-                rate_limit_queue_ref.index().await;
-                info!("Done indexing rate limit queue");
-            }
-        });
-    }
-
-    let bots = Arc::new(Bots::default());
 
     info!("Starting Actix HTTP server!");
 
@@ -124,18 +97,15 @@ async fn main() -> std::io::Result<()> {
                     ])
                     .max_age(3600),
             )
-            .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(analytics_queue.clone()))
-            .app_data(web::Data::new(rate_limit_queue.clone()))
-            .app_data(web::Data::new(bots.clone()))
+            .app_data(web::Data::new(client.clone()))
+            .app_data(web::Data::new(reader.clone()))
             .service(index::index_get)
-            .service(query::views_query)
-            .service(query::downloads_query)
             .service(query::multipliers_query)
             .service(ingest::downloads_ingest)
             .service(ingest::page_view_ingest)
     })
-    .bind(dotenv::var("BIND_ADDR").unwrap())?
+    .bind(dotenvy::var("BIND_ADDR").unwrap())?
     .run()
     .await
 }
@@ -161,14 +131,12 @@ fn check_env_vars() -> bool {
         failed |= true;
     }
 
-    failed |= check_var::<String>("DATABASE_URL");
+    failed |= check_var::<String>("CLICKHOUSE_URL");
+    failed |= check_var::<String>("CLICKHOUSE_USER");
+    failed |= check_var::<String>("CLICKHOUSE_PASSWORD");
+    failed |= check_var::<String>("CLICKHOUSE_DATABASE");
 
-    failed |= check_var::<String>("ARIADNE_ADMIN_KEY");
-
-    failed |= check_var::<String>("PEPPER");
-
-    failed |= check_var::<String>("LABRINTH_API_URL");
-    failed |= check_var::<String>("LABRINTH_RATE_LIMIT_KEY");
+    failed |= check_var::<String>("MAXMIND_LICENSE_KEY");
 
     failed
 }
