@@ -53,7 +53,7 @@ pub async fn downloads_ingest(
         .map_err(|_| ApiError::InvalidInput("invalid version ID in download URL!".to_string()))?;
 
     let ip = convert_to_ip_v6(&url_input.ip)
-        .map_err(|_| ApiError::InvalidInput("invalid ip address!".to_string()))?;
+        .unwrap_or_else(|_| Ipv4Addr::new(127, 0, 0, 1).to_ipv6_mapped());
 
     analytics_queue
         .add_download(Download {
@@ -112,8 +112,9 @@ pub async fn page_view_ingest(
         .ok_or_else(|| ApiError::InvalidInput("invalid page view URL specified!".to_string()))?;
 
     let allowed_origins = parse_strings_from_var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
-    if !(domain.ends_with(".modrinth.com") || domain == "modrinth.com")
-        || !allowed_origins.contains(&"*".to_string())
+    if !(domain.ends_with(".modrinth.com")
+        || domain == "modrinth.com"
+        || allowed_origins.contains(&"*".to_string()))
     {
         return Err(ApiError::InvalidInput(
             "invalid page view URL specified!".to_string(),
