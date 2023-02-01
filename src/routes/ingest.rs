@@ -53,7 +53,7 @@ pub async fn downloads_ingest(
         .map_err(|_| ApiError::InvalidInput("invalid version ID in download URL!".to_string()))?;
 
     let ip = convert_to_ip_v6(&url_input.ip)
-        .map_err(|_| ApiError::InvalidInput("invalid ip address!".to_string()))?;
+        .unwrap_or_else(|_| Ipv4Addr::new(127, 0, 0, 1).to_ipv6_mapped());
 
     analytics_queue
         .add_download(Download {
