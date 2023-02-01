@@ -92,14 +92,13 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(
                 Cors::default()
-                    .allowed_origin_fn(|origin, req_head| {
-                        if ["/v1/views", "/v1/downloads"].contains(&req_head.uri.path()) {
-                            true
-                        } else {
-                            parse_strings_from_var("CORS_ALLOWED_ORIGINS")
-                                .unwrap_or_default()
+                    .allowed_origin_fn(|origin, _req_head| {
+                        let allowed_origins =
+                            parse_strings_from_var("CORS_ALLOWED_ORIGINS").unwrap_or_default();
+
+                        allowed_origins.contains(&"*".to_string())
+                            || allowed_origins
                                 .contains(&origin.to_str().unwrap_or_default().to_string())
-                        }
                     })
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec![
