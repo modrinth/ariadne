@@ -1,15 +1,6 @@
 version: '3'
 services:
-  postgres_db:
-    image: postgres:alpine
-    volumes:
-      - db-data:/var/lib/postgresql/data
+  clickhouse:
+    image: clickhouse/clickhouse-server
     ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: ariadne
-      POSTGRES_PASSWORD: ariadne
-      POSTGRES_HOST_AUTH_METHOD: trust
-volumes:
-  db-data:
+      - "8123:8123"

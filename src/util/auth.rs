@@ -46,8 +46,8 @@ pub async fn check_is_authorized(
     let client = reqwest::Client::new();
 
     let user: User = client
-        .get(format!("{}user", dotenv::var("LABRINTH_API_URL")?))
-        .header("x-ratelimit-key", dotenv::var("LABRINTH_RATE_LIMIT_KEY")?)
+        .get(format!("{}user", dotenvy::var("LABRINTH_API_URL")?))
+        .header("x-ratelimit-key", dotenvy::var("LABRINTH_RATE_LIMIT_KEY")?)
         .header("Authorization", token)
         .send()
         .await?
@@ -59,10 +59,10 @@ pub async fn check_is_authorized(
             let members: Team = client
                 .get(format!(
                     "{}project/{}/members",
-                    dotenv::var("LABRINTH_API_URL")?,
+                    dotenvy::var("LABRINTH_API_URL")?,
                     project_id
                 ))
-                .header("x-ratelimit-key", dotenv::var("LABRINTH_RATE_LIMIT_KEY")?)
+                .header("x-ratelimit-key", dotenvy::var("LABRINTH_RATE_LIMIT_KEY")?)
                 .header("Authorization", token)
                 .send()
                 .await?

@@ -1,3 +1,3 @@
 pub mod analytics;
-pub mod ratelimit;
+pub mod maxmind;
 pub mod scheduler;
