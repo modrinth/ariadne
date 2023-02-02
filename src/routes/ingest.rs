@@ -16,7 +16,28 @@ use std::sync::Arc;
 use url::Url;
 use uuid::Uuid;
 
-const FILTERED_HEADERS: &[&str] = &["authorization", "cookie", "modrinth-admin"];
+const FILTERED_HEADERS: &[&str] = &[
+    "authorization",
+    "cookie",
+    "modrinth-admin",
+    // we already retrieve/use these elsewhere- so they are unneeded
+    "user-agent",
+    "cf-connecting-ip",
+    "cf-ipcountry",
+    "x-forwarded-for",
+    "x-real-ip",
+    // We don't need the information vercel provides from its headers
+    "x-vercel-ip-city",
+    "x-vercel-ip-timezone",
+    "x-vercel-ip-longitude",
+    "x-vercel-proxy-signature",
+    "x-vercel-ip-country-region",
+    "x-vercel-forwarded-for",
+    "x-vercel-proxied-for",
+    "x-vercel-proxy-signature-ts",
+    "x-vercel-ip-latitude",
+    "x-vercel-ip-country",
+];
 
 fn convert_to_ip_v6(src: &str) -> Result<Ipv6Addr, AddrParseError> {
     let ip_addr: IpAddr = src.parse()?;
@@ -121,7 +142,8 @@ pub async fn page_view_ingest(
         ));
     }
 
-    let from_server = req.headers()
+    let from_server = req
+        .headers()
         .get(crate::util::guards::ADMIN_KEY_HEADER)
         .map(|x| x.to_str().unwrap_or_default() == &*admin_key)
         .unwrap_or(false);
@@ -135,7 +157,6 @@ pub async fn page_view_ingest(
                 val.to_str().unwrap_or_default().to_string(),
             )
         })
-        .filter(|x| !FILTERED_HEADERS.contains(&&*x.0))
         .collect::<HashMap<String, String>>();
 
     let headers = if from_server {
@@ -168,7 +189,7 @@ pub async fn page_view_ingest(
         ip,
         country: maxmind.query(ip).await.unwrap_or_default(),
         user_agent: headers.get("user-agent").cloned().unwrap_or_default(),
-        headers: headers.into_iter().collect(),
+        headers: headers.into_iter().filter(|x| !FILTERED_HEADERS.contains(&&*x.0)).collect(),
     };
 
     if let Some(segments) = url.path_segments() {
