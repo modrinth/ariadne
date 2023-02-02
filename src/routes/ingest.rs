@@ -121,6 +121,11 @@ pub async fn page_view_ingest(
         ));
     }
 
+    let from_server = req.headers()
+        .get(crate::util::guards::ADMIN_KEY_HEADER)
+        .map(|x| x.to_str().unwrap_or_default() == &*admin_key)
+        .unwrap_or(false);
+
     let temp_headers = req
         .headers()
         .into_iter()
@@ -132,11 +137,6 @@ pub async fn page_view_ingest(
         })
         .filter(|x| !FILTERED_HEADERS.contains(&&*x.0))
         .collect::<HashMap<String, String>>();
-
-    let from_server = temp_headers
-        .get(&*crate::util::guards::ADMIN_KEY_HEADER.to_lowercase())
-        .map(|x| x == &*admin_key)
-        .unwrap_or(false);
 
     let headers = if from_server {
         if let Some(headers) = &url_input.headers {
